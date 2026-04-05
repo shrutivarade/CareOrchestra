@@ -1,0 +1,13 @@
+{
+  "event_type": "vitals_submitted",
+  "event_id": "EVT_001",
+  "patient_id": "PT001",
+  "timestamp": "2025-04-05T14:30:00Z",
+  "vital_type": "blood_pressure",
+  "systolic": 165,
+  "diastolic": 100,
+  "unit": "mmHg",
+  "measurement_location": "home",
+  "device": "blood pressure cuff",
+  "notes": "Measured after breakfast, feeling slightly anxious"
+}

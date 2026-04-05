@@ -1,0 +1,6 @@
+alert_id,patient_id,alert_type,severity,title,description,created_at,acknowledged
+ALT001,PT001,vital_abnormal,high,High Blood Pressure Alert,Patient with hypertension shows Stage 2 BP reading,2025-03-26T15:45:00Z,false
+ALT002,PT003,medication_missed,high,Critical Medication Missed,Insulin dose missed - patient at risk for hyperglycemia,2025-04-02T08:30:00Z,true
+ALT003,PT001,trend_warning,moderate,Worsening Hypertension Trend,Blood pressure trending upward over past 2 weeks,2025-03-20T10:00:00Z,true
+ALT004,PT003,medication_missed,moderate,Medication Adherence Concern,Multiple missed insulin doses in past week,2025-03-25T09:15:00Z,false
+ALT005,PT002,appointment_due,low,Upcoming Appointment Reminder,Follow-up appointment scheduled for 2025-04-08,2025-04-05T08:00:00Z,false

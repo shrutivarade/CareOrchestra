@@ -1,0 +1,16 @@
+{
+  "event_type": "appointment_upcoming",
+  "event_id": "EVT_003",
+  "patient_id": "PT002",
+  "timestamp": "2025-04-05T10:00:00Z",
+  "appointment_id": "APT001",
+  "appointment_type": "follow-up",
+  "provider_id": "DR001",
+  "provider_name": "Dr. Sarah Johnson",
+  "scheduled_at": "2025-04-08T10:00:00Z",
+  "days_until": 3,
+  "location": "Clinic Room 201",
+  "reason": "Diabetes management review",
+  "requires_vitals": true,
+  "notes": "Patient should bring blood glucose log and meal diary"
+}

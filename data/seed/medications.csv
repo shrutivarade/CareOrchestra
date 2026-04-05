@@ -1,0 +1,11 @@
+medication_id,patient_id,name,dosage,frequency,route,reason,start_date,end_date
+MED001,PT001,Lisinopril,10mg,once daily,oral,hypertension,2024-01-15T00:00:00Z,null
+MED002,PT001,Metformin,500mg,twice daily,oral,type2_diabetes,2023-06-10T00:00:00Z,null
+MED003,PT003,Insulin Glargine,15 units,once daily,subcutaneous_injection,type1_diabetes,2022-03-20T00:00:00Z,null
+MED004,PT003,Lisinopril,20mg,once daily,oral,hypertension,2024-02-01T00:00:00Z,null
+MED005,PT002,Metoprolol,50mg,twice daily,oral,heart_disease,2023-09-15T00:00:00Z,null
+MED006,PT002,Atorvastatin,40mg,once daily,oral,heart_disease,2023-09-15T00:00:00Z,null
+MED007,PT004,Albuterol,2 puffs,as needed,inhalation,asthma,2024-01-10T00:00:00Z,null
+MED008,PT004,Fluticasone,2 puffs,twice daily,inhalation,asthma,2024-01-10T00:00:00Z,null
+MED009,PT005,Tiotropium,18mcg,once daily,inhalation,copd,2023-11-01T00:00:00Z,null
+MED010,PT005,Amlodipine,5mg,once daily,oral,hypertension,2024-01-20T00:00:00Z,null

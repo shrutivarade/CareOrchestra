@@ -1,0 +1,13 @@
+{
+  "event_type": "medication_check",
+  "event_id": "EVT_002",
+  "patient_id": "PT003",
+  "timestamp": "2025-04-05T08:00:00Z",
+  "medication_id": "MED003",
+  "medication_name": "Insulin Glargine",
+  "scheduled_time": "2025-04-05T08:00:00Z",
+  "grace_period_minutes": 30,
+  "expected_dose": "15 units",
+  "administration_route": "subcutaneous_injection",
+  "notes": "Morning fasting insulin dose"
+}

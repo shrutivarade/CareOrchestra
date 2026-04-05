@@ -1,0 +1,6 @@
+appointment_id,patient_id,provider_id,provider_name,appointment_type,scheduled_at,location,notes
+APT001,PT002,DR002,Dr. Sarah Johnson,follow-up,2025-04-08T10:00:00Z,Clinic Room 201,Diabetes management review
+APT002,PT001,DR001,Dr. Michael Chen,routine,2025-04-15T14:30:00Z,Clinic Room 105,Annual hypertension check
+APT003,PT003,DR001,Dr. Michael Chen,follow-up,2025-04-12T09:00:00Z,Clinic Room 102,Blood sugar management
+APT004,PT004,DR003,Dr. Lisa Rodriguez,routine,2025-04-20T11:00:00Z,Clinic Room 203,Asthma control assessment
+APT005,PT005,DR002,Dr. Sarah Johnson,follow-up,2025-04-25T15:30:00Z,Clinic Room 301,COPD management
