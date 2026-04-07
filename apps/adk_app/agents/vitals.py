@@ -1,5 +1,10 @@
 """Vitals Agent - Analyzes vital signs and detects abnormal patterns."""
 
+import logging
+from ..tools import get_mcp_manager
+
+logger = logging.getLogger(__name__)
+
 
 class VitalsAgent:
     """
@@ -12,44 +17,70 @@ class VitalsAgent:
 
     def __init__(self):
         """Initialize vitals agent."""
-        pass
+        self.mcp_manager = get_mcp_manager()
 
     # -------------------------------
-    # INTERNAL: Fetch vitals (from ADK state / DB later)
+    # INTERNAL: Fetch vitals from BigQuery via MCP
     # -------------------------------
     async def _fetch_vitals(self, patient_id: str):
         """
-        For now, simulate DB fetch.
-        Later replace with BigQuery using patient_id.
+        Fetch patient vital signs from BigQuery using MCP tools.
+        
+        Args:
+            patient_id: Patient ID to fetch vitals for
+            
+        Returns:
+            List of vital sign dictionaries
         """
-        return [
-            {"bp_systolic": 150, "bp_diastolic": 95, "glucose": 180, "spo2": 96, "heart_rate": 90},
-            {"bp_systolic": 145, "bp_diastolic": 92, "glucose": 170, "spo2": 97, "heart_rate": 88},
-            {"bp_systolic": 138, "bp_diastolic": 88, "glucose": 160, "spo2": 98, "heart_rate": 85},
-        ]
+        try:
+            vitals = await self.mcp_manager.execute_tool("get_recent_vitals")
+            
+            # Filter for the specific patient
+            patient_vitals = [v for v in vitals if v.get("patient_id") == patient_id]
+            
+            if patient_vitals:
+                logger.info(f"Fetched {len(patient_vitals)} vital records for patient {patient_id}")
+                return patient_vitals
+            else:
+                logger.warning(f"No vital data found for patient {patient_id}")
+                # Return empty list instead of mock data
+                return []
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch vitals: {e}")
+            return []
 
     # -------------------------------
     # RULES (can later move to risk_rules/vitals_rules.py)
     # -------------------------------
     def _apply_rules(self, vitals):
+        """Apply clinical rules to detect abnormal values."""
         issues = []
+        
+        if not vitals:
+            return issues
+        
         latest = vitals[0]
 
         # Blood Pressure
-        if latest["bp_systolic"] > 140 or latest["bp_diastolic"] > 90:
-            issues.append({"type": "blood_pressure", "level": "high"})
+        systolic = latest.get("bp_systolic") or latest.get("value")
+        if systolic and systolic > 140:
+            issues.append({"type": "blood_pressure", "level": "high", "value": systolic})
 
         # Glucose
-        if latest["glucose"] > 140:
-            issues.append({"type": "glucose", "level": "high"})
+        glucose = latest.get("glucose")
+        if glucose and glucose > 140:
+            issues.append({"type": "glucose", "level": "high", "value": glucose})
 
-        # Oxygen
-        if latest["spo2"] < 95:
-            issues.append({"type": "spo2", "level": "low"})
+        # Oxygen Saturation
+        spo2 = latest.get("spo2")
+        if spo2 and spo2 < 95:
+            issues.append({"type": "spo2", "level": "low", "value": spo2})
 
         # Heart Rate
-        if latest["heart_rate"] > 100:
-            issues.append({"type": "heart_rate", "level": "high"})
+        hr = latest.get("heart_rate")
+        if hr and hr > 100:
+            issues.append({"type": "heart_rate", "level": "high", "value": hr})
 
         return issues
 
@@ -57,6 +88,7 @@ class VitalsAgent:
     # ANOMALY DETECTION
     # -------------------------------
     def _detect_anomalies(self, vitals):
+        """Detect sudden changes in vital signs."""
         anomalies = []
 
         if len(vitals) < 2:
@@ -65,11 +97,16 @@ class VitalsAgent:
         latest = vitals[0]
         prev = vitals[1]
 
-        if abs(latest["glucose"] - prev["glucose"]) > 20:
+        # Check for sudden glucose change
+        latest_glucose = latest.get("value") if latest.get("vital_type") == "glucose" else latest.get("glucose")
+        prev_glucose = prev.get("value") if prev.get("vital_type") == "glucose" else prev.get("glucose")
+        
+        if latest_glucose and prev_glucose and abs(latest_glucose - prev_glucose) > 20:
             anomalies.append("sudden glucose change")
 
-        if abs(latest["bp_systolic"] - prev["bp_systolic"]) > 20:
-            anomalies.append("sudden BP change")
+        # Check for abnormal flag from database
+        if latest.get("abnormal_flag"):
+            anomalies.append(f"abnormal {latest.get('vital_type', 'vital')}")
 
         return anomalies
 
@@ -77,24 +114,35 @@ class VitalsAgent:
     # TREND CALCULATION
     # -------------------------------
     def _calculate_trend(self, values):
+        """Calculate trend (increasing, decreasing, stable) from values."""
         if len(values) < 2:
             return "insufficient_data"
 
-        if values[-1] > values[0]:
+        if values[-1] > values[0] * 1.1:  # More than 10% increase
             return "increasing"
-        elif values[-1] < values[0]:
+        elif values[-1] < values[0] * 0.9:  # More than 10% decrease
             return "decreasing"
         return "stable"
 
     async def analyze_vitals(self, patient_id: str) -> dict:
         """
-        Analyze patient vitals.
+        Analyze patient vitals from BigQuery.
+        
+        Args:
+            patient_id: Patient ID to analyze
+            
+        Returns:
+            Analysis result with status, issues, anomalies, and trends
         """
-        # ✅ 1. Query recent vitals
+        # ✅ 1. Query recent vitals from BigQuery
         vitals = await self._fetch_vitals(patient_id)
 
         if not vitals:
-            return {"status": "no_data"}
+            return {
+                "status": "no_data",
+                "patient_id": patient_id,
+                "message": "No recent vital data available"
+            }
 
         latest = vitals[0]
 
@@ -104,14 +152,9 @@ class VitalsAgent:
         # ✅ 3. Detect anomalies
         anomalies = self._detect_anomalies(vitals)
 
-        # ✅ 4. Identify trends
+        # ✅ 4. Identify trends (simplified)
         trends = {
-            "glucose": self._calculate_trend(
-                [v["glucose"] for v in reversed(vitals)]
-            ),
-            "bp_systolic": self._calculate_trend(
-                [v["bp_systolic"] for v in reversed(vitals)]
-            ),
+            "overall": "stable" if not issues else "warning"
         }
 
         # ✅ 5. Final result
@@ -125,17 +168,50 @@ class VitalsAgent:
             "latest_vitals": latest,
             "issues": issues,
             "anomalies": anomalies,
-            "trends": trends
+            "trends": trends,
+            "total_records": len(vitals)
         }
 
     async def check_trend(self, patient_id: str, vital_type: str) -> dict:
         """
         Check trend for specific vital over time.
+        
+        Args:
+            patient_id: Patient ID
+            vital_type: Type of vital to check (e.g., 'glucose', 'blood_pressure')
+            
+        Returns:
+            Trend analysis with risk assessment
         """
         # ✅ 1. Query historical vitals
         vitals = await self._fetch_vitals(patient_id)
 
-        values = [v[vital_type] for v in reversed(vitals) if vital_type in v]
+        if not vitals:
+            return {
+                "vital_type": vital_type,
+                "trend": "insufficient_data",
+                "risk": "unknown",
+                "message": "No vital data available"
+            }
+
+        # Extract values for the specific vital type
+        values = []
+        for v in reversed(vitals):
+            # Try different field names
+            if v.get("vital_type") == vital_type:
+                val = v.get("value")
+                if val:
+                    values.append(val)
+            elif vital_type in v:
+                values.append(v[vital_type])
+
+        if not values:
+            return {
+                "vital_type": vital_type,
+                "trend": "no_data",
+                "risk": "unknown",
+                "message": f"No {vital_type} data found"
+            }
 
         # ✅ 2. Compute trend
         trend = self._calculate_trend(values)
@@ -150,5 +226,6 @@ class VitalsAgent:
         return {
             "vital_type": vital_type,
             "trend": trend,
-            "risk": risk
+            "risk": risk,
+            "data_points": len(values)
         }

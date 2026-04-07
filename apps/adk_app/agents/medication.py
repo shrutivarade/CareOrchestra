@@ -3,8 +3,10 @@ import json
 import logging
 import datetime
 from pathlib import Path
+from typing import Optional, Dict, Any
 import google.cloud.logging
 from dotenv import load_dotenv
+from ..tools import get_mcp_manager
 
 # --- Setup Logging and Environment ---
 try:
@@ -15,51 +17,31 @@ except Exception:
     logging.info("Cloud logging not available, using standard logging.")
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Dummy Patient Database (Kept exactly as per your details)
-# ---------------------------------------------------------------------------
 
-DUMMY_PATIENT_DB = {
-    "session_001": {
-        "patient_id": "PAT-1001",
-        "name":       "Rajesh Kumar",
-        "age":        58,
-        "medication": "Metformin 500mg",
-    },
-    "session_002": {
-        "patient_id": "PAT-1002",
-        "name":       "Sunita Sharma",
-        "age":        45,
-        "medication": "Amlodipine 5mg",
-    },
-    "session_003": {
-        "patient_id": "PAT-1003",
-        "name":       "Amit Verma",
-        "age":        62,
-        "medication": "Atorvastatin 10mg",
-    },
-}
-
-DEFAULT_PATIENT = {
-    "patient_id": "PAT-0000",
-    "name":       "Guest Patient",
-    "age":        None,
-    "medication": "prescribed medication",
-}
-
-# ---------------------------------------------------------------------------
-# Tool Functions for Gemini Coordinator
-# ---------------------------------------------------------------------------
-
-def fetch_patient_from_db(session_id: str = "session_001") -> dict:
+async def fetch_patient_medications(patient_id: str) -> list:
     """
-    Simulates a database lookup for the current session's patient.
-    Always call this first to get the patient's name and medication details.
+    Fetch medications for a patient from BigQuery via MCP.
+    
+    Args:
+        patient_id: The patient ID
+        
+    Returns:
+        List of medication records
     """
-    patient = DUMMY_PATIENT_DB.get(session_id, DEFAULT_PATIENT)
-    logging.info(f"[DB Lookup] Resolved patient: {json.dumps(patient)}")
-    return patient
+    try:
+        mcp_manager = get_mcp_manager()
+        medications = await mcp_manager.execute_tool("get_medications")
+        
+        # Filter for the specific patient
+        patient_meds = [m for m in medications if m.get("patient_id") == patient_id]
+        
+        logger.info(f"Fetched {len(patient_meds)} medications for patient {patient_id}")
+        return patient_meds
+    except Exception as e:
+        logger.error(f"Failed to fetch medications: {e}")
+        return []
 
 
 def save_medication_response(
@@ -100,7 +82,7 @@ def save_medication_response(
     }
 
     # In a real app, this would be an INSERT INTO BigQuery or Postgres
-    logging.info(f"[Medication Record Saved] {json.dumps(medication_record)}")
+    logger.info(f"[Medication Record Saved] {json.dumps(medication_record)}")
 
     return {
         "status":            "success",
@@ -111,11 +93,63 @@ def save_medication_response(
 class MedicationAgent:
     """
     Main class-based wrapper for the Medication Agent logic.
+    Integrates with MCP tools to fetch and track medication adherence.
     """
     def __init__(self):
         self.agent_name = "MedicationAgent"
+        self.mcp_manager = get_mcp_manager()
 
     async def check_medication_adherence(self, patient_id: str) -> dict:
-        """Helper method for internal app logic."""
-        # For now, returns a simple status
-        return {"status": "active", "patient_id": patient_id}
+        """
+        Check medication adherence for a patient.
+        
+        Args:
+            patient_id: Patient ID to check
+            
+        Returns:
+            Adherence status and medication list
+        """
+        try:
+            medications = await fetch_patient_medications(patient_id)
+            
+            if not medications:
+                return {
+                    "status": "no_data",
+                    "patient_id": patient_id,
+                    "message": "No medication data found"
+                }
+            
+            # Analyze adherence pattern
+            total = len(medications)
+            adherent = len([m for m in medications if m.get("adherence_status") == "adherent"])
+            adherence_rate = (adherent / total * 100) if total > 0 else 0
+            
+            status = "good" if adherence_rate >= 80 else "needs_improvement"
+            
+            return {
+                "status": status,
+                "patient_id": patient_id,
+                "medications": medications,
+                "adherence_rate": adherence_rate,
+                "total_medications": total,
+                "adherent_count": adherent
+            }
+        except Exception as e:
+            logger.error(f"Failed to check medication adherence: {e}")
+            return {
+                "status": "error",
+                "patient_id": patient_id,
+                "message": str(e)
+            }
+
+    async def get_patient_medications(self, patient_id: str) -> list:
+        """
+        Get list of medications for a patient.
+        
+        Args:
+            patient_id: Patient ID
+            
+        Returns:
+            List of medication dictionaries
+        """
+        return await fetch_patient_medications(patient_id)

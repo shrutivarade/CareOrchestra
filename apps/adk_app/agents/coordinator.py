@@ -1,25 +1,52 @@
 import os
 import logging
+import asyncio
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from .monitoring import MonitoringAgent
+from ..tools import get_mcp_manager
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def get_patient_profile(patient_id: str) -> dict:
+async def get_patient_profile(patient_id: str) -> dict:
     """
-    Retrieves the patient's condition, name, and care plan.
+    Retrieves the patient's condition, name, and care plan from BigQuery via MCP tools.
     Always call this first to greet the patient personally.
     """
-    return {
-        "name": "John Doe",
-        "condition": "Hypertension",
-        "last_visit": "2024-01-10",
-        "target_bp": "130/80"
-    }
+    try:
+        mcp_manager = get_mcp_manager()
+        results = await mcp_manager.execute_tool("get_patients")
+        
+        # Filter for the specific patient
+        for patient in results:
+            if patient.get("patient_id") == patient_id:
+                return {
+                    "patient_id": patient.get("patient_id"),
+                    "name": f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip(),
+                    "risk_level": patient.get("risk_level"),
+                    "status": patient.get("status"),
+                }
+        
+        # If patient not found, return default
+        logger.warning(f"Patient {patient_id} not found in database")
+        return {
+            "patient_id": patient_id,
+            "name": "Patient",
+            "risk_level": "unknown",
+            "status": "unknown",
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch patient profile: {e}")
+        return {
+            "patient_id": patient_id,
+            "name": "Patient",
+            "risk_level": "unknown",
+            "status": "unknown",
+            "error": str(e),
+        }
 
 
 def send_to_monitoring_agent(patient_id: str, summary: str) -> dict:
